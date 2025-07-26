@@ -1,0 +1,23 @@
+# Env
+.env
+config/debezium-connector.json
+
+# Py cache
+__pycache__/
+*.pyc
+
+# Venv
+venv/
+
+# IDE
+.vscode/
+
+# Spark
+conf/
+jars/
+log4j2.properties
+
+# Temp Scripts
+scripts/kafka_testconnect.py
+scripts/insert_testdata.py
+config/mysql.cnf

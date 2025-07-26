@@ -1,0 +1,5 @@
+faker==18.11.1
+mysql-connector-python==8.0.33
+confluent-kafka==2.5.0
+pymongo==4.3.3
+redis==4.5.4
