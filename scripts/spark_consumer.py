@@ -53,8 +53,6 @@ def parse_payload(payload, topic):
     try:
         result = {}
         for key, val in payload.items():
-            if key in ('__op', '__deleted', '__ts_ms'):
-                continue
             if topic == EnvConfig.TOPIC_ORDERS and key == 'total_amount':
                 result[key] = decode_decimal(val)
             elif topic == EnvConfig.TOPIC_SHIPPING and key == 'estimated_delivery':
@@ -92,24 +90,31 @@ def process_partition(rows, collection_name, topic, redis_update=False):
         try:
             msg = json.loads(row.value.decode("utf-8"))
             payload = msg.get("payload", {})
-            op = payload.get("__op")
+            op = payload.get("op")
+            before = payload.get("before")
+            after = payload.get("after")
 
             if op not in ('c', 'u', 'd'):
                 continue
 
-            parsed = parse_payload(payload, topic)
-            pk_field = list(parsed.keys())[0] if parsed else None
+            if op in ('c', 'u') and after:
+                parsed = parse_payload(after, topic)
+                pk_field = list(parsed.keys())[0] if parsed else None
+                
+                if pk_field:
+                    bulk_ops.append(
+                        ReplaceOne({pk_field: parsed[pk_field]}, parsed, upsert=True)
+                    )
+                    if redis_update and redis_client and "order_id" in parsed:
+                        redis_client.set(f"order:{parsed['order_id']}", parsed.get("status", ""))
+            elif op == 'd' and before:
+                parsed = parse_payload(before, topic)
+                pk_field = list(parsed.keys())[0] if parsed else None
 
-            if op in ('c', 'u') and parsed:
-                bulk_ops.append(
-                    ReplaceOne({pk_field: parsed[pk_field]}, parsed, upsert=True)
-                )
-                if redis_update and redis_client and "order_id" in parsed:
-                    redis_client.set(f"order:{parsed['order_id']}", parsed.get("status", ""))
-            elif op == 'd' and pk_field:
-                mongo_col.delete_one({pk_field: parsed[pk_field]})
-                if redis_update and redis_client and "order_id" in parsed:
-                    redis_client.delete(f"order:{parsed['order_id']}")
+                if pk_field:
+                    mongo_col.delete_one({pk_field: parsed[pk_field]})
+                    if redis_update and redis_client and "order_id" in parsed:
+                        redis_client.delete(f"order:{parsed['order_id']}")
         except Exception as e:
             logger.error(f"Error processing record: {e}")
 
@@ -127,7 +132,7 @@ def process_stream(topic, collection_name, redis_update=False):
         .format("kafka") \
         .option("kafka.bootstrap.servers", EnvConfig.KAFKA_BOOTSTRAP_SERVERS) \
         .option("subscribe", topic) \
-        .option("startingOffsets", "earliest") \
+        .option("startingOffsets", "latest") \
         .load()
 
     return df.select(col("value")).writeStream \
