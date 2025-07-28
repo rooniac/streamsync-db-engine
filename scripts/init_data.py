@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import random
+import argparse
 from faker import Faker
 import mysql.connector
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 fake = Faker()
 
-def insert_data():
+def insert_data(num_customers=10, num_orders=100):
     try:
         conn = mysql.connector.connect(
             host=EnvConfig.MYSQL_HOST,
@@ -36,7 +37,7 @@ def insert_data():
         customers = []
         emails = set()
 
-        while len(customers) < 300:
+        while len(customers) < num_customers:
             name = fake.name()
             email = fake.email()
             if email in emails:
@@ -50,7 +51,7 @@ def insert_data():
             customers
         )
         conn.commit()
-        logger.info("Inserted 300 customers")
+        logger.info(f"Inserted {num_customers} customers")
 
         # Get customer IDs
         cursor.execute("SELECT customer_id FROM customers")
@@ -60,7 +61,7 @@ def insert_data():
         shipping_methods = ["Standard", "Express", "Next-day", "Pickup"]
 
         # Insert orders + shipping_info
-        for _ in range(1000):
+        for _ in range(num_orders):
             customer_id = random.choice(customer_ids)
             total_amount = round(random.uniform(10.0, 500.0), 2)
             status = random.choice(order_statuses)
@@ -82,7 +83,7 @@ def insert_data():
             )
 
         conn.commit()
-        logger.info("Inserted 1000 orders + shipping_info")
+        logger.info(f"Inserted {num_orders} orders + shipping_info")
 
     except mysql.connector.Error as err:
         logger.error(f"MySQL error: {err}")
@@ -93,4 +94,9 @@ def insert_data():
             logger.info("MySQL connection closed.")
 
 if __name__ == "__main__":
-    insert_data()
+    parser = argparse.ArgumentParser(description="Insert sample data to MySQL")
+    parser.add_argument("--customers", type=int, default=10, help="Number of customers to insert")
+    parser.add_argument("--orders", type=int, default=100, help="Number of orders (and shipping_info) to insert")
+    args = parser.parse_args()
+
+    insert_data(args.customers, args.orders)
