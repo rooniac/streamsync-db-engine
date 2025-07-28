@@ -1,6 +1,5 @@
 # Env
 .env
-config/debezium-connector.json
 
 # Py cache
 __pycache__/
@@ -22,6 +21,3 @@ scripts/kafka_testconnect.py
 scripts/insert_testdata.py
 config/mysql.cnf
 note.txt
-customers.json
-orders.json
-shipping_info.json
